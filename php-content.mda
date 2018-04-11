@@ -1,0 +1,9 @@
+<?php
+declare(strict_types=1);
+
+namespace ${c.owner.getFullyQualifiedName("\\")};
+
+${php.nodeType(c)} ${c.name}
+{
+${php.classBody(c)}${php.interfaceBody(c)}
+}

@@ -1,0 +1,164 @@
+import in.labulle.anycode.uml.*;
+
+class PhpDirective {
+  def indent = " " * 4
+
+  def nodeType(IClassifier c) {
+    return c instanceof IClass ? "class" : "interface"
+  }
+
+  def interfaceBody(IClassifier c) {
+    if (c instanceof IClass) {
+      return ""
+    }
+    return (
+      c.operations.collect { indenten(abstractMethod(it)) }
+    ).join("\n\n")
+  }
+
+  def classBody(IClassifier c) {
+    if (c instanceof IInterface) {
+      return ""
+    }
+    return (
+      attributes(c.attributes)
+      + methods(c.operations)
+      + getters(c.attributes)
+    ).join("\n\n")
+  }
+
+  def attributes(List<IAttribute> attributes) {
+    return attributes.collect { indenten(attribute(it)) }
+  }
+
+	def attribute(IAttribute a) {
+    def visibility = visibility(a.visibility)
+    def attributeName = nameOrTypeName(a)
+    def type = a.dataType.name
+    def isRelationAttribute = a instanceof IRelationAttribute
+    return """
+           |/**
+           | * @var $type \$$attributeName
+           | */
+           |$visibility \$$attributeName;
+           """.stripMargin().trim()
+	}
+
+  def getters(List<IAttribute> attributes) {
+    return attributes.collect { indenten(getter(it)) }
+  }
+
+	def getter(IAttribute a) {
+    if (Visibility.PUBLIC == a.visibility || !a.hasStereotype("get")) {
+      return ""
+    }
+    def attributeName = nameOrTypeName(a)
+    def methodName = "get" + capitalize(attributeName)
+    def returnType = a.dataType.name
+
+		return """
+           |public function $methodName(): $returnType
+           |{
+           |${indent}return \$this->$attributeName;
+           |}
+           """.stripMargin().trim()
+	}
+
+  def methods(List<IOperation> operations) {
+    return operations.collect { indenten(method(it)) }
+  }
+
+  def abstractMethod(IOperation o) {
+    def visibility = visibility(o.visibility)
+    def methodName = o.name
+    def returnType = o.returnType.name
+    def parameters = parameters(o.parameters)
+    def methodPhpdoc = methodPhpdoc(o)
+    if (methodName == "__construct") {
+      return """
+             |$methodPhpdoc
+             |$visibility function __construct($parameters);
+             """.stripMargin().trim()
+    }
+    return """
+           |$methodPhpdoc
+           |$visibility function $methodName($parameters): $returnType;
+           """.stripMargin().trim()
+  }
+
+  def method(IOperation o) {
+    def visibility = visibility(o.visibility)
+    def methodName = o.name
+    def returnType = o.returnType.name
+    def parameters = parameters(o.parameters)
+    def methodPhpdoc = methodPhpdoc(o)
+    if (methodName == "__construct") {
+      return """
+             |$methodPhpdoc
+             |$visibility function __construct($parameters)
+             |{
+             |$indent// @todo: implement
+             |}
+             """.stripMargin().trim()
+    }
+    return """
+           |$methodPhpdoc
+           |$visibility function $methodName($parameters): $returnType
+           |{
+           |$indent// @todo: implement
+           |}
+           """.stripMargin().trim()
+  }
+
+  def methodPhpdoc(IOperation o){
+    def lines = (
+      o.parameters.collect { parameterPhpdoc(it) }
+      + [returnTypePhpdoc(o.returnType)]
+    ).findAll { it != "" }.collect { " * " + it }
+    return (["/**"] + lines + [" */"]).join("\n")
+  }
+
+  def parameters(List<IParameter> parameters) {
+    return parameters.collect { parameter(it) }.join(", ")
+  }
+
+  def parameter(IParameter p) {
+    def name = p.name
+    def type = p.dataType.name
+    return """$type \$$name"""
+  }
+
+  def parameterPhpdoc(IParameter p) {
+    def name = p.name
+    def type = p.dataType.name == "array" ? "???[]" : p.dataType.name
+    return """@var $type \$name"""
+  }
+
+  def returnTypePhpdoc(IClassifier c) {
+    if (c.name == "void") {
+      return ""
+    }
+    def type = c.name == "array" ? "???[]" : c.name
+    return """@return $type"""
+  }
+
+  def indenten(String code) {
+    return code.split("\n").collect { indent + it }.join("\n")
+  }
+
+  def visibility(Visibility v) {
+    return v.toString().toLowerCase()
+  }
+
+  def nameOrTypeName(IAttribute a) {
+    return a.name ? a.name : uncapitalize(a.dataType.name)
+  }
+
+	def capitalize(String s) {
+		return s[0].toUpperCase() + s.substring(1)
+	}
+
+  def uncapitalize(String s) {
+    return s[0].toLowerCase() + s.substring(1)
+  }
+}
